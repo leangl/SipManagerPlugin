@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SipManager</string>
+    <string name="sip_active_title">SIP Activo</string>
+    <string name="sip_active_ticker">SIP Activo</string>
+    <string name="sip_active_content">Tocar para abrir el teléfono</string>
+    <string name="sip_inactive_title">SIP Inactivo</string>
+    <string name="sip_inactive_ticker">SIP Inactivo</string>
+    <string name="sip_inactive_content">Tocar para abrir el teléfono</string>
+</resources>
