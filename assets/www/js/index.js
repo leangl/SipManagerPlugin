@@ -28,8 +28,8 @@ var app = {
 			onCallEnded: function() { // La llamada ha sido finalizada
 				alert('onCallEnded');
 			},
-			onIncomingCall: function() { // Hay una llamada entrante
-				alert('onIncomingCall');
+			onIncomingCall: function(callerId) { // Hay una llamada entrante
+				alert('onIncomingCall: ' + callerId);
 			}
 		}
 

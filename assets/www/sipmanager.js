@@ -43,8 +43,8 @@
 		    	onCallEnded: function() {
 		    		console.log('onCallEnded');
 		    	},
-		    	onIncomingCall: function() {
-		    		console.log('onIncomingCall');
+		    	onIncomingCall: function(callerId) {
+		    		console.log('onIncomingCall: ' + callerId);
 		    	}
 		    }
 		};

@@ -17,6 +17,8 @@ import android.net.sip.SipProfile;
 import android.net.sip.SipRegistrationListener;
 import android.os.Binder;
 import android.os.IBinder;
+import android.os.PowerManager;
+import android.os.PowerManager.WakeLock;
 import android.support.v4.app.NotificationCompat;
 import ar.com.zgroup.sip.R;
 import ar.com.zgroup.sip.SipManagerActivity;
@@ -354,16 +356,25 @@ public class SipManagerService extends Service {
 	private class IncomingCallReceiver extends BroadcastReceiver {
 		
 		@Override
-		public void onReceive(Context context, Intent intent) {
+		public void onReceive(Context context, final Intent intent) {
 			if (SipManager.isIncomingCallIntent(intent)) {
 				try {
-					SipAudioCall.Listener listener = new SipAudioCall.Listener() {
-						@Override
-						public void onRinging(SipAudioCall call, SipProfile caller) {
-							if (mListener != null) mListener.onIncomingCall();
-						}
-					};
 					if (isRegistered()) {
+						// Acquire wakelock to turn on screen on incoming call
+						PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+						final WakeLock wl = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP, "TAG");
+						wl.acquire();
+						
+						SipAudioCall.Listener listener = new SipAudioCall.Listener() {
+							@Override
+							public void onRinging(SipAudioCall call, SipProfile caller) {
+								String callId = SipManager.getCallId(intent);
+								//String sessionDescription = SipManager.getOfferSessionDescription(intent);
+								if (mListener != null) mListener.onIncomingCall(callId);
+								wl.release(); // Release wakelock
+							}
+						};
+						
 						mIncomingCall = mSipManager.takeAudioCall(intent, null);
 						mIncomingCall.setListener(listener, true);
 					}
@@ -398,7 +409,7 @@ public class SipManagerService extends Service {
 		
 		void onCallEnded();
 		
-		void onIncomingCall();
+		void onIncomingCall(String callerId);
 		
 	}
 }

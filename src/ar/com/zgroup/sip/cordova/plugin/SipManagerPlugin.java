@@ -16,6 +16,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.net.sip.SipException;
 import android.os.IBinder;
+import ar.com.zgroup.sip.SipManagerActivity;
 import ar.com.zgroup.sip.service.SipManagerService;
 import ar.com.zgroup.sip.service.SipManagerService.SipManagerLocalBinder;
 import ar.com.zgroup.sip.service.SipManagerService.SipManagerListener;
@@ -188,8 +189,10 @@ public class SipManagerPlugin extends CordovaPlugin implements SipManagerListene
 	}
 	
 	@Override
-	public void onIncomingCall() {
-		webView.sendJavascript("SipManagerPlugin.listener.onIncomingCall()");
+	public void onIncomingCall(String callerId) {
+		// Launch phone activity on incoming call
+		cordova.getActivity().startActivity(new Intent(cordova.getActivity(), SipManagerActivity.class));
+		webView.sendJavascript("SipManagerPlugin.listener.onIncomingCall('" + callerId + "')"); // TODO escape callerId
 	}
 	
 }
