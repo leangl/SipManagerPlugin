@@ -31,7 +31,7 @@ var app = {
 			onIncomingCall: function(callerId) { // Hay una llamada entrante
 				alert('onIncomingCall: ' + callerId);
 			}
-		}
+		};
 
 		SipManagerPlugin.init(); // Inicialización del plugin
 
@@ -57,12 +57,22 @@ var app = {
 					domain : domain,
 					username : username,
 					password : password
+				},
+				error: function() {
+					alert('error');
+				},
+				success: function() {
+					alert('success');
 				}
 			});
 		});
 
 		$('#disconnect').on('click', function() {
-			SipManagerPlugin.disconnect(); // Desconexión con el servidor SIP (debería haberse realizado una conexión exitosa antes!)
+			SipManagerPlugin.disconnect({
+				error: function() {
+					alert('error');
+				}
+			}); // Desconexión con el servidor SIP (debería haberse realizado una conexión exitosa antes!)
 		});
 
 		$('#makeCall').on('click', function() {
@@ -81,26 +91,44 @@ var app = {
 				data : {
 					domain : domain,
 					username : username
+				},
+				error: function() {
+					alert('error');
 				}
 			});
 		});
 
 		$('#endCall').on('click', function() {
-			SipManagerPlugin.endCurrentCall(); // Finalizar la llamada actual
+			SipManagerPlugin.endCurrentCall({
+				error: function() {
+					alert('error');
+				}
+			}); // Finalizar la llamada actual
 		});
 
 		$('#takeCall').on('click', function() {
-			SipManagerPlugin.takeIncomingCall(); // Atender la llamada entrante
+			SipManagerPlugin.takeIncomingCall({
+				error: function() {
+					alert('error');
+				}
+			}); // Atender la llamada entrante
 		});
 
 		$('#rejectCall').on('click', function() {
-			SipManagerPlugin.rejectIncomingCall(); // Rechazar la llamada entrante sin antenderla
+			SipManagerPlugin.rejectIncomingCall({
+				error: function() {
+					alert('error');
+				}
+			}); // Rechazar la llamada entrante sin antenderla
 		});
 
 		$('#speakerModeOn').on('click', function() {
 			SipManagerPlugin.setSpeakerMode({ // Habilitar el altoparlante
 				data : {
 					speakerMode : true
+				},
+				error: function() {
+					alert('error');
 				}
 			});
 		});
@@ -109,6 +137,9 @@ var app = {
 			SipManagerPlugin.setSpeakerMode({ // Deshabilitar el altoparlante
 				data : {
 					speakerMode : false
+				},
+				error: function() {
+					alert('error');
 				}
 			});
 		});

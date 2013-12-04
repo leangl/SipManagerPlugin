@@ -40,9 +40,68 @@ public class SipManagerService extends Service {
 	
 	private SipManagerListener mListener;
 	
+	private SipRegistrationListener mRegistrationListener = new RegistrationListener();
+	private SipRegistrationListener mPostRegistrationListener = new PostRegistrationListener();
+	
 	@Override
 	public IBinder onBind(Intent intent) {
 		return new SipManagerLocalBinder();
+	}
+	
+	private final class RegistrationListener implements SipRegistrationListener {
+		public void onRegistering(String localProfileUri) {
+			LOG.i(TAG, "Registering with SIP Server...");
+			if (mListener != null) mListener.onConnecting();
+		}
+		
+		public void onRegistrationDone(String localProfileUri, long expiryTime) {
+			LOG.i(TAG, "Registration succeded...");
+			if (mIncomingCallReceiver == null) {
+				mIncomingCallReceiver = new IncomingCallReceiver();
+				registerReceiver(mIncomingCallReceiver, new IntentFilter(INCOMING_CALL_ACTION));
+			}
+			if (mRunningNotification == null) {
+				mRunningNotification = createRunningNotification(R.string.sip_active_title, R.string.sip_active_content,
+						R.string.sip_active_ticker);
+				startForeground(RUNNING_NOTIFICATION_ID, mRunningNotification);
+			}
+			
+			// Listener for POST registration events (connection lost, re-registering, etc.)
+			try {
+				mSipManager.setRegistrationListener(mSipProfile.getUriString(), mPostRegistrationListener);
+			} catch (SipException e) {
+				LOG.e(TAG, "Error setting post registration listener.", e);
+			}
+			
+			if (mListener != null) mListener.onConnectionSuccess();
+		}
+		
+		public void onRegistrationFailed(String localProfileUri, int errorCode, String errorMessage) {
+			LOG.w(TAG, "Registration failed.");
+			if (mListener != null) mListener.onConnectionFailed();
+		}
+	}
+	
+	private final class PostRegistrationListener implements SipRegistrationListener {
+		public void onRegistering(String localProfileUri) {
+			LOG.i(TAG, "Reconnecting to SIP Server...");
+		}
+		
+		public void onRegistrationDone(String localProfileUri, long expiryTime) {
+			LOG.i(TAG, "Reconnection succeded");
+			mRunningNotification = createRunningNotification(R.string.sip_active_title, R.string.sip_active_content,
+					R.string.sip_active_ticker);
+			startForeground(RUNNING_NOTIFICATION_ID, mRunningNotification);
+		}
+		
+		public void onRegistrationFailed(String localProfileUri, int errorCode, String errorMessage) {
+			LOG.w(TAG, "Reconnection failed");
+			NotificationManager nManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+			mRunningNotification = createRunningNotification(R.string.sip_inactive_title, R.string.sip_inactive_content,
+					R.string.sip_inactive_ticker);
+			nManager.notify(RUNNING_NOTIFICATION_ID, mRunningNotification);
+			startForeground(RUNNING_NOTIFICATION_ID, mRunningNotification);
+		}
 	}
 	
 	public class SipManagerLocalBinder extends Binder {
@@ -91,56 +150,7 @@ public class SipManagerService extends Service {
 			mSipManager.open(mSipProfile, pendingIntent, null);
 			
 			// Listener for registration events (registration success/failure)
-			mSipManager.register(mSipProfile, 30, new SipRegistrationListener() {
-				
-				public void onRegistering(String localProfileUri) {
-					LOG.i(TAG, "Registering with SIP Server...");
-					if (mListener != null) mListener.onConnecting();
-				}
-				
-				public void onRegistrationDone(String localProfileUri, long expiryTime) {
-					LOG.i(TAG, "Registration succeded...");
-					if (mIncomingCallReceiver == null) {
-						mIncomingCallReceiver = new IncomingCallReceiver();
-						registerReceiver(mIncomingCallReceiver, new IntentFilter(INCOMING_CALL_ACTION));
-					}
-					if (mRunningNotification == null) {
-						mRunningNotification = createRunningNotification(R.string.sip_active_title, R.string.sip_active_content,
-								R.string.sip_active_ticker);
-						startForeground(RUNNING_NOTIFICATION_ID, mRunningNotification);
-					}
-					
-					if (mListener != null) mListener.onConnectionSuccess();
-				}
-				
-				public void onRegistrationFailed(String localProfileUri, int errorCode, String errorMessage) {
-					LOG.w(TAG, "Registration failed.");
-					if (mListener != null) mListener.onConnectionFailed();
-				}
-			});
-			
-			// Listener for POST registration events (connection lost, re-registering, etc.)
-			mSipManager.setRegistrationListener(mSipProfile.getUriString(), new SipRegistrationListener() {
-				
-				public void onRegistering(String localProfileUri) {
-					LOG.i(TAG, "Reconnecting to SIP Server...");
-				}
-				
-				public void onRegistrationDone(String localProfileUri, long expiryTime) {
-					LOG.i(TAG, "Reconnection succeded");
-					mRunningNotification = createRunningNotification(R.string.sip_active_title, R.string.sip_active_content,
-							R.string.sip_active_ticker);
-					startForeground(RUNNING_NOTIFICATION_ID, mRunningNotification);
-				}
-				
-				public void onRegistrationFailed(String localProfileUri, int errorCode, String errorMessage) {
-					LOG.w(TAG, "Reconnection failed");
-					NotificationManager nManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-					mRunningNotification = createRunningNotification(R.string.sip_inactive_title, R.string.sip_inactive_content,
-							R.string.sip_inactive_ticker);
-					nManager.notify(RUNNING_NOTIFICATION_ID, mRunningNotification);
-				}
-			});
+			mSipManager.register(mSipProfile, 30, mRegistrationListener);
 		} catch (Exception e) {
 			LOG.e(TAG, "Failed to start SipManagerService.", e);
 			disconnect();
@@ -232,11 +242,10 @@ public class SipManagerService extends Service {
 				mIncomingCall = null;
 			} catch (SipException e) {
 				LOG.e(TAG, "Error taking incoming call");
-				throw e;
-			} finally {
 				try {
 					rejectIncomingCall();
-				} catch (SipException e) {}
+				} catch (SipException e1) {}
+				throw e;
 			}
 		}
 	}
@@ -298,29 +307,28 @@ public class SipManagerService extends Service {
 	 * @throws SipException
 	 */
 	public void makeCall(String username, String domain) throws SipException {
-		SipAudioCall.Listener listener = new SipAudioCall.Listener() {
-			
-			@Override
-			public void onCallEstablished(SipAudioCall call) {
-				call.startAudio();
-				
-				if (call.isMuted()) {
-					call.toggleMute();
-				}
-				mCurrentCall = call;
-				if (mListener != null) mListener.onCallEstablished();
-			}
-			
-			@Override
-			public void onCallEnded(SipAudioCall call) {
-				if (mListener != null) mListener.onCallEnded();
-			}
-		};
 		try {
 			SipProfile.Builder builder = new SipProfile.Builder(username, domain);
 			SipProfile otherProfile = builder.build();
 			
-			mSipManager.makeAudioCall(mSipProfile, otherProfile, listener, 30);
+			mSipManager.makeAudioCall(mSipProfile, otherProfile, new SipAudioCall.Listener() {
+				
+				@Override
+				public void onCallEstablished(SipAudioCall call) {
+					call.startAudio();
+					
+					if (call.isMuted()) {
+						call.toggleMute();
+					}
+					mCurrentCall = call;
+					if (mListener != null) mListener.onCallEstablished();
+				}
+				
+				@Override
+				public void onCallEnded(SipAudioCall call) {
+					if (mListener != null) mListener.onCallEnded();
+				}
+			}, 30);
 		} catch (Exception e) {
 			LOG.e(TAG, "Error making call.", e);
 			throw new SipException("Error making call.", e);
@@ -366,13 +374,25 @@ public class SipManagerService extends Service {
 						wl.acquire();
 						
 						SipAudioCall.Listener listener = new SipAudioCall.Listener() {
+							
 							@Override
 							public void onRinging(SipAudioCall call, SipProfile caller) {
-								String callId = SipManager.getCallId(intent);
-								//String sessionDescription = SipManager.getOfferSessionDescription(intent);
-								if (mListener != null) mListener.onIncomingCall(callId);
+								if (mListener != null) mListener.onIncomingCall(caller.getUserName());
 								wl.release(); // Release wakelock
 							}
+							
+							@Override
+							public void onError(SipAudioCall call, int errorCode, String errorMessage) {
+								// TODO Auto-generated method stub
+								super.onError(call, errorCode, errorMessage);
+							}
+							
+							@Override
+							public void onChanged(SipAudioCall call) {
+								// TODO Auto-generated method stub
+								super.onChanged(call);
+							}
+							
 						};
 						
 						mIncomingCall = mSipManager.takeAudioCall(intent, null);
