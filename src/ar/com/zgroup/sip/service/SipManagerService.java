@@ -370,7 +370,7 @@ public class SipManagerService extends Service {
 					if (isRegistered()) {
 						// Acquire wakelock to turn on screen on incoming call
 						PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-						final WakeLock wl = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP, "TAG");
+						final WakeLock wl = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP, "SipManagerServiceWKL");
 						wl.acquire();
 						
 						SipAudioCall.Listener listener = new SipAudioCall.Listener() {
@@ -383,13 +383,11 @@ public class SipManagerService extends Service {
 							
 							@Override
 							public void onError(SipAudioCall call, int errorCode, String errorMessage) {
-								// TODO Auto-generated method stub
 								super.onError(call, errorCode, errorMessage);
 							}
 							
 							@Override
 							public void onChanged(SipAudioCall call) {
-								// TODO Auto-generated method stub
 								super.onChanged(call);
 							}
 							
